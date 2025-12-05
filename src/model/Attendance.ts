@@ -1,6 +1,5 @@
 // model/Attendance.ts
-import pool from '../config/connection';
-import { ResultSetHeader } from 'mysql2';
+import pool, { ResultSetHeader } from '../config/connection';
 
 export enum AttendanceStatus {
     CHECKED_IN = 'checked_in',

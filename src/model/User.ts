@@ -1,6 +1,5 @@
 // model/User.ts
-import pool from '../config/connection';
-import { ResultSetHeader } from 'mysql2';
+import pool, { ResultSetHeader } from '../config/connection';
 import { UserRole } from '../types/roles';
 
 export interface User {
