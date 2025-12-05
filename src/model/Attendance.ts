@@ -1,5 +1,5 @@
 // model/Attendance.ts
-import pool, { ResultSetHeader } from '../config/connection';
+import pool from '../config/connection';
 
 export enum AttendanceStatus {
     CHECKED_IN = 'checked_in',
@@ -41,7 +41,7 @@ class AttendanceStore {
     // CREATE attendance record
     async create(data: AttendanceCreationAttributes): Promise<Attendance> {
         const status = data.status || AttendanceStatus.CHECKED_IN;
-        const [result] = await pool.query<ResultSetHeader>(
+        const [, result] = await pool.query(
             `INSERT INTO attendance (userId, checkInTime, checkOutTime, workDate, totalHours, status, notes) 
        VALUES (?, ?, ?, ?, ?, ?, ?)`,
             [
@@ -159,7 +159,7 @@ class AttendanceStore {
         values.push(id);
 
         const sql = `UPDATE attendance SET ${fields.join(', ')} WHERE id = ?`;
-        const [result] = await pool.query<ResultSetHeader>(sql, values);
+        const [, result] = await pool.query(sql, values);
 
         if (result.affectedRows === 0) return null;
 
@@ -169,7 +169,7 @@ class AttendanceStore {
 
     // DELETE
     async delete(id: number): Promise<boolean> {
-        const [result] = await pool.query<ResultSetHeader>(
+        const [, result] = await pool.query(
             'DELETE FROM attendance WHERE id = ?',
             [id]
         );

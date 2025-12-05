@@ -26,7 +26,7 @@ class UserStore {
   // CREATE user
   async create(data: UserCreationAttributes): Promise<User> {
     const role = data.role || UserRole.USER; // Default role is USER
-    const [result] = await pool.query<ResultSetHeader>(
+    const [, result] = await pool.query(
       `INSERT INTO users (username, password, email, fullName, role) VALUES (?, ?, ?, ?, ?)`,
       [data.username, data.password, data.email, data.fullName, role]
     );
@@ -70,7 +70,7 @@ class UserStore {
     values.push(id);
 
     const sql = `UPDATE users SET ${fields.join(', ')} WHERE id = ?`;
-    const [result] = await pool.query<ResultSetHeader>(sql, values);
+    const [, result] = await pool.query(sql, values);
 
     if (result.affectedRows === 0) return null;
 
@@ -80,7 +80,7 @@ class UserStore {
 
   // DELETE
   async delete(id: number): Promise<boolean> {
-    const [result] = await pool.query<ResultSetHeader>(
+    const [, result] = await pool.query(
       'DELETE FROM users WHERE id = ?',
       [id]
     );
