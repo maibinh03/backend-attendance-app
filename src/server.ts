@@ -35,9 +35,14 @@ const startServer = async (): Promise<void> => {
         console.log('📦 Initializing SQLite database...');
         await initializeSQLiteDatabase();
 
-        // Test database connection
-        await pool.getConnection();
-        console.log('✅ Database connection successful');
+        // Test database connection bằng cách query đơn giản
+        try {
+            await pool.query('SELECT 1');
+            console.log('✅ Database connection successful');
+        } catch (error) {
+            console.error('❌ Database connection test failed:', error);
+            throw error;
+        }
 
         // Start server
         app.listen(PORT, () => {

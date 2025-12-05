@@ -12,12 +12,29 @@ class SQLiteConnection {
   private dbPath: string;
 
   constructor(dbPath?: string) {
-    this.dbPath = dbPath || path.join(__dirname, '../../database/attendance.db');
+    // Sử dụng process.cwd() để đảm bảo đường dẫn chính xác từ project root
+    // Khi chạy từ dist, __dirname sẽ là dist/config, nên cần đi lên 2 cấp
+    // Khi chạy từ src (dev mode), cũng cần đi lên 2 cấp
+    if (dbPath) {
+      this.dbPath = dbPath;
+    } else {
+      // Thử nhiều đường dẫn có thể
+      const possiblePaths = [
+        path.join(process.cwd(), 'database/attendance.db'),
+        path.join(__dirname, '../../database/attendance.db'),
+        path.join(process.cwd(), 'backend/database/attendance.db')
+      ];
+      
+      // Chọn đường dẫn đầu tiên hợp lý (database folder tồn tại hoặc có thể tạo)
+      this.dbPath = possiblePaths[0]; // Ưu tiên từ project root
+    }
 
     const dbDir = path.dirname(this.dbPath);
     if (!fs.existsSync(dbDir)) {
       fs.mkdirSync(dbDir, { recursive: true });
     }
+    
+    console.log(`📁 Database will be created at: ${this.dbPath}`);
   }
 
   async connect(): Promise<void> {
