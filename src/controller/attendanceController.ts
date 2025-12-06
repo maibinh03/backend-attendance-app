@@ -19,10 +19,11 @@ export const checkIn = async (req: AuthRequest, res: Response) => {
       message: 'Chấm công vào thành công',
       data: attendance
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    console.error('Check-in error:', error);
     return res.status(400).json({
       success: false,
-      message: error.message || 'Không thể chấm công vào'
+      message: error instanceof Error ? error.message : 'Không thể chấm công vào'
     });
   }
 };
@@ -42,10 +43,11 @@ export const checkOut = async (req: AuthRequest, res: Response) => {
       message: 'Chấm công ra thành công',
       data: attendance
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    console.error('Check-out error:', error);
     return res.status(400).json({
       success: false,
-      message: error.message || 'Không thể chấm công ra'
+      message: error instanceof Error ? error.message : 'Không thể chấm công ra'
     });
   }
 };
@@ -63,10 +65,11 @@ export const getTodayAttendance = async (req: AuthRequest, res: Response) => {
       success: true,
       data: attendance
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    console.error('Get today attendance error:', error);
     return res.status(500).json({
       success: false,
-      message: error.message || 'Không thể lấy dữ liệu chấm công'
+      message: error instanceof Error ? error.message : 'Không thể lấy dữ liệu chấm công'
     });
   }
 };
@@ -79,8 +82,29 @@ export const getUserAttendanceHistory = async (req: AuthRequest, res: Response) 
     }
 
     const userId = req.user.id;
-    const limit = req.query.limit ? Number(req.query.limit) : undefined;
-    const offset = req.query.offset ? Number(req.query.offset) : undefined;
+    
+    let limit: number | undefined;
+    let offset: number | undefined;
+
+    if (req.query.limit) {
+      limit = Number(req.query.limit);
+      if (isNaN(limit) || limit < 1) {
+        return res.status(400).json({
+          success: false,
+          message: 'Limit phải là số dương'
+        });
+      }
+    }
+
+    if (req.query.offset) {
+      offset = Number(req.query.offset);
+      if (isNaN(offset) || offset < 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'Offset phải là số không âm'
+        });
+      }
+    }
 
     const attendance = await attendanceService.getUserAttendance(userId, limit, offset);
 
@@ -88,10 +112,11 @@ export const getUserAttendanceHistory = async (req: AuthRequest, res: Response) 
       success: true,
       data: attendance
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    console.error('Get user attendance history error:', error);
     return res.status(500).json({
       success: false,
-      message: error.message || 'Không thể lấy lịch sử chấm công'
+      message: error instanceof Error ? error.message : 'Không thể lấy lịch sử chấm công'
     });
   }
 };
@@ -108,15 +133,45 @@ export const getStatistics = async (req: AuthRequest, res: Response) => {
       return res.status(403).json({ message: 'Bạn không có quyền xem thống kê' });
     }
 
-    const startDate = req.query.startDate 
-      ? new Date(req.query.startDate as string) 
-      : new Date(new Date().setDate(new Date().getDate() - 30)); // Mặc định 30 ngày gần đây
-    
-    const endDate = req.query.endDate 
-      ? new Date(req.query.endDate as string) 
-      : new Date();
+    let startDate: Date;
+    let endDate: Date;
 
-    const userId = req.query.userId ? Number(req.query.userId) : undefined;
+    if (req.query.startDate) {
+      startDate = new Date(req.query.startDate as string);
+      if (isNaN(startDate.getTime())) {
+        return res.status(400).json({
+          success: false,
+          message: 'Ngày bắt đầu không hợp lệ'
+        });
+      }
+    } else {
+      // Mặc định 30 ngày gần đây
+      startDate = new Date();
+      startDate.setDate(startDate.getDate() - 30);
+    }
+    
+    if (req.query.endDate) {
+      endDate = new Date(req.query.endDate as string);
+      if (isNaN(endDate.getTime())) {
+        return res.status(400).json({
+          success: false,
+          message: 'Ngày kết thúc không hợp lệ'
+        });
+      }
+    } else {
+      endDate = new Date();
+    }
+
+    let userId: number | undefined;
+    if (req.query.userId) {
+      userId = Number(req.query.userId);
+      if (isNaN(userId) || userId < 1) {
+        return res.status(400).json({
+          success: false,
+          message: 'UserId không hợp lệ'
+        });
+      }
+    }
 
     const statistics = await attendanceService.getStatistics(startDate, endDate, userId);
 
@@ -124,10 +179,11 @@ export const getStatistics = async (req: AuthRequest, res: Response) => {
       success: true,
       data: statistics
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    console.error('Get statistics error:', error);
     return res.status(500).json({
       success: false,
-      message: error.message || 'Không thể lấy thống kê'
+      message: error instanceof Error ? error.message : 'Không thể lấy thống kê'
     });
   }
 };
@@ -144,17 +200,70 @@ export const getAllAttendance = async (req: AuthRequest, res: Response) => {
       return res.status(403).json({ message: 'Bạn không có quyền xem tất cả chấm công' });
     }
 
-    const startDate = req.query.startDate 
-      ? new Date(req.query.startDate as string) 
-      : undefined;
-    
-    const endDate = req.query.endDate 
-      ? new Date(req.query.endDate as string) 
-      : undefined;
+    let startDate: Date | undefined;
+    let endDate: Date | undefined;
 
-    const userId = req.query.userId ? Number(req.query.userId) : undefined;
-    const limit = req.query.limit ? Number(req.query.limit) : 100;
-    const offset = req.query.offset ? Number(req.query.offset) : 0;
+    if (req.query.startDate) {
+      startDate = new Date(req.query.startDate as string);
+      if (isNaN(startDate.getTime())) {
+        return res.status(400).json({
+          success: false,
+          message: 'Ngày bắt đầu không hợp lệ'
+        });
+      }
+    }
+    
+    if (req.query.endDate) {
+      endDate = new Date(req.query.endDate as string);
+      if (isNaN(endDate.getTime())) {
+        return res.status(400).json({
+          success: false,
+          message: 'Ngày kết thúc không hợp lệ'
+        });
+      }
+    }
+
+    // Validate date range
+    if (startDate && endDate && startDate > endDate) {
+      return res.status(400).json({
+        success: false,
+        message: 'Ngày bắt đầu phải nhỏ hơn hoặc bằng ngày kết thúc'
+      });
+    }
+
+    let userId: number | undefined;
+    let limit: number = 100;
+    let offset: number = 0;
+
+    if (req.query.userId) {
+      userId = Number(req.query.userId);
+      if (isNaN(userId) || userId < 1) {
+        return res.status(400).json({
+          success: false,
+          message: 'UserId không hợp lệ'
+        });
+      }
+    }
+
+    if (req.query.limit) {
+      limit = Number(req.query.limit);
+      if (isNaN(limit) || limit < 1 || limit > 1000) {
+        return res.status(400).json({
+          success: false,
+          message: 'Limit phải là số từ 1 đến 1000'
+        });
+      }
+    }
+
+    if (req.query.offset) {
+      offset = Number(req.query.offset);
+      if (isNaN(offset) || offset < 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'Offset phải là số không âm'
+        });
+      }
+    }
 
     let attendance;
     if (startDate && endDate) {
@@ -167,10 +276,11 @@ export const getAllAttendance = async (req: AuthRequest, res: Response) => {
       success: true,
       data: attendance
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    console.error('Get all attendance error:', error);
     return res.status(500).json({
       success: false,
-      message: error.message || 'Không thể lấy dữ liệu chấm công'
+      message: error instanceof Error ? error.message : 'Không thể lấy dữ liệu chấm công'
     });
   }
 };

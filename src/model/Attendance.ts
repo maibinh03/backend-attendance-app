@@ -41,9 +41,9 @@ class AttendanceStore {
     // CREATE attendance record
     async create(data: AttendanceCreationAttributes): Promise<Attendance> {
         const status = data.status || AttendanceStatus.CHECKED_IN;
-        const [, result] = await pool.query(
-            `INSERT INTO attendance (userId, checkInTime, checkOutTime, workDate, totalHours, status, notes) 
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        const [rows, result] = await pool.query(
+            `INSERT INTO attendance ("userId", "checkInTime", "checkOutTime", "workDate", "totalHours", status, notes) 
+       VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING *`,
             [
                 data.userId,
                 data.checkInTime,
@@ -55,9 +55,19 @@ class AttendanceStore {
             ]
         );
 
+        // If RETURNING * returns the full row, use it directly
+        if (rows && rows.length > 0) {
+            return (rows as Attendance[])[0];
+        }
+
+        // Fallback: get by insertId
         const newId = result.insertId;
-        const [rows] = await pool.query('SELECT * FROM attendance WHERE id = ?', [newId]);
-        return (rows as Attendance[])[0];
+        if (!newId) {
+            throw new Error('Failed to get inserted attendance ID');
+        }
+
+        const [selectedRows] = await pool.query('SELECT * FROM attendance WHERE id = ?', [newId]);
+        return (selectedRows as Attendance[])[0];
     }
 
     // FIND BY ID
@@ -69,7 +79,7 @@ class AttendanceStore {
     // FIND BY USER ID
     async findByUserId(userId: number): Promise<Attendance[]> {
         const [rows] = await pool.query(
-            'SELECT * FROM attendance WHERE userId = ? ORDER BY workDate DESC, checkInTime DESC',
+            'SELECT * FROM attendance WHERE "userId" = ? ORDER BY "workDate" DESC, "checkInTime" DESC',
             [userId]
         );
         return rows as Attendance[];
@@ -79,7 +89,7 @@ class AttendanceStore {
     async findByUserIdAndDate(userId: number, workDate: Date): Promise<Attendance | null> {
         const dateStr = workDate.toISOString().split('T')[0]; // YYYY-MM-DD
         const [rows] = await pool.query(
-            'SELECT * FROM attendance WHERE userId = ? AND workDate = ?',
+            'SELECT * FROM attendance WHERE "userId" = ? AND "workDate" = ?',
             [userId, dateStr]
         );
         return (rows as Attendance[])[0] || null;
@@ -89,7 +99,7 @@ class AttendanceStore {
     async findTodayByUserId(userId: number): Promise<Attendance | null> {
         const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
         const [rows] = await pool.query(
-            'SELECT * FROM attendance WHERE userId = ? AND workDate = ?',
+            'SELECT * FROM attendance WHERE "userId" = ? AND "workDate" = ?',
             [userId, today]
         );
         return (rows as Attendance[])[0] || null;
@@ -97,7 +107,7 @@ class AttendanceStore {
 
     // FIND ALL (with pagination)
     async findAll(limit?: number, offset?: number): Promise<Attendance[]> {
-        let query = 'SELECT * FROM attendance ORDER BY workDate DESC, checkInTime DESC';
+        let query = 'SELECT * FROM attendance ORDER BY "workDate" DESC, "checkInTime" DESC';
         const params: any[] = [];
 
         if (limit !== undefined) {
@@ -118,15 +128,15 @@ class AttendanceStore {
         const startDateStr = startDate.toISOString().split('T')[0];
         const endDateStr = endDate.toISOString().split('T')[0];
 
-        let query = 'SELECT * FROM attendance WHERE workDate >= ? AND workDate <= ?';
+        let query = 'SELECT * FROM attendance WHERE "workDate" >= ? AND "workDate" <= ?';
         const params: any[] = [startDateStr, endDateStr];
 
         if (userId !== undefined) {
-            query += ' AND userId = ?';
+            query += ' AND "userId" = ?';
             params.push(userId);
         }
 
-        query += ' ORDER BY workDate DESC, checkInTime DESC';
+        query += ' ORDER BY "workDate" DESC, "checkInTime" DESC';
 
         const [rows] = await pool.query(query, params);
         return rows as Attendance[];
@@ -138,11 +148,11 @@ class AttendanceStore {
         const values: any[] = [];
 
         if (data.checkOutTime !== undefined) {
-            fields.push("checkOutTime = ?");
+            fields.push("\"checkOutTime\" = ?");
             values.push(data.checkOutTime);
         }
         if (data.totalHours !== undefined) {
-            fields.push("totalHours = ?");
+            fields.push("\"totalHours\" = ?");
             values.push(data.totalHours);
         }
         if (data.status !== undefined) {
@@ -190,19 +200,19 @@ class AttendanceStore {
 
         let query = `
       SELECT 
-        COUNT(*) as totalRecords,
-        COALESCE(SUM(totalHours), 0) as totalHours,
-        COALESCE(AVG(totalHours), 0) as averageHours,
-        SUM(CASE WHEN status = 'checked_in' THEN 1 ELSE 0 END) as checkedInCount,
-        SUM(CASE WHEN status = 'checked_out' THEN 1 ELSE 0 END) as checkedOutCount,
-        SUM(CASE WHEN status = 'absent' THEN 1 ELSE 0 END) as absentCount
+        COUNT(*) as "totalRecords",
+        COALESCE(SUM("totalHours"), 0) as "totalHours",
+        COALESCE(AVG("totalHours"), 0) as "averageHours",
+        SUM(CASE WHEN status = 'checked_in' THEN 1 ELSE 0 END) as "checkedInCount",
+        SUM(CASE WHEN status = 'checked_out' THEN 1 ELSE 0 END) as "checkedOutCount",
+        SUM(CASE WHEN status = 'absent' THEN 1 ELSE 0 END) as "absentCount"
       FROM attendance 
-      WHERE workDate >= ? AND workDate <= ?
+      WHERE "workDate" >= ? AND "workDate" <= ?
     `;
         const params: any[] = [startDateStr, endDateStr];
 
         if (userId !== undefined) {
-            query += ' AND userId = ?';
+            query += ' AND "userId" = ?';
             params.push(userId);
         }
 

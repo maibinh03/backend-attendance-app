@@ -26,15 +26,24 @@ class UserStore {
   // CREATE user
   async create(data: UserCreationAttributes): Promise<User> {
     const role = data.role || UserRole.USER; // Default role is USER
-    const [, result] = await pool.query(
-      `INSERT INTO users (username, password, email, fullName, role) VALUES (?, ?, ?, ?, ?)`,
+    const [rows, result] = await pool.query(
+      `INSERT INTO users (username, password, email, "fullName", role) VALUES (?, ?, ?, ?, ?) RETURNING *`,
       [data.username, data.password, data.email, data.fullName, role]
     );
 
-    const newId = result.insertId;
+    // If RETURNING * returns the full row, use it directly
+    if (rows && rows.length > 0) {
+      return (rows as User[])[0];
+    }
 
-    const [rows] = await pool.query('SELECT * FROM users WHERE id = ?', [newId]);
-    return (rows as User[])[0];
+    // Fallback: get by insertId
+    const newId = result.insertId;
+    if (!newId) {
+      throw new Error('Failed to get inserted user ID');
+    }
+
+    const [selectedRows] = await pool.query('SELECT * FROM users WHERE id = ?', [newId]);
+    return (selectedRows as User[])[0];
   }
 
   // FIND BY USERNAME
@@ -51,7 +60,7 @@ class UserStore {
 
   // FIND ALL
   async findAll(): Promise<User[]> {
-    const [rows] = await pool.query('SELECT * FROM users');
+    const [rows] = await pool.query('SELECT * FROM users ORDER BY id');
     return (rows as User[]);
   }
 
@@ -63,7 +72,7 @@ class UserStore {
     if (data.username !== undefined) { fields.push("username = ?"); values.push(data.username); }
     if (data.password !== undefined) { fields.push("password = ?"); values.push(data.password); }
     if (data.email !== undefined) { fields.push("email = ?"); values.push(data.email); }
-    if (data.fullName !== undefined) { fields.push("fullName = ?"); values.push(data.fullName); }
+    if (data.fullName !== undefined) { fields.push("\"fullName\" = ?"); values.push(data.fullName); }
     if (data.role !== undefined) { fields.push("role = ?"); values.push(data.role); }
     if (fields.length === 0) return null;
 

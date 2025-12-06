@@ -5,7 +5,8 @@ import userRoutes from './routes/userRoutes';
 import attendanceRoutes from './routes/attendanceRoutes';
 import { errorHandler } from './middleware/errorHandler';
 import pool from './config/connection';
-import { initializeSQLiteDatabase } from './utils/initSQLite';
+import { initializePostgresDatabase } from './utils/initPostgres';
+import { AddressInfo } from 'net';
 import dotenv from 'dotenv';
 dotenv.config();
 
@@ -27,13 +28,14 @@ app.use('/api/attendance', attendanceRoutes);
 app.use(errorHandler);
 
 // Initialize database and start server
-const PORT = process.env.PORT as string;
+const PORT = Number(process.env.PORT) || 3000;
+const HOST = process.env.HOST; // optional, server can bind to all interfaces when undefined
 
 const startServer = async (): Promise<void> => {
     try {
-        // Khởi tạo SQLite database
-        console.log('📦 Initializing SQLite database...');
-        await initializeSQLiteDatabase();
+        // Khởi tạo PostgreSQL database
+        console.log('📦 Initializing PostgreSQL database...');
+        await initializePostgresDatabase();
 
         // Test database connection bằng cách query đơn giản
         try {
@@ -45,10 +47,31 @@ const startServer = async (): Promise<void> => {
         }
 
         // Start server
-        app.listen(PORT, () => {
-            console.log(`🚀 Server is running on http://localhost:${PORT}`);
-            console.log(`💾 Database: SQLite (file-based, no server needed)`);
-        });
+        const server = HOST
+            ? app.listen(PORT, HOST, logServerAddress)
+            : app.listen(PORT, logServerAddress);
+
+        function logServerAddress(): void {
+            const address = server.address();
+            let displayHost = HOST || 'localhost';
+            let displayPort = PORT;
+
+            if (typeof address === 'string') {
+                displayHost = address;
+            } else if (address && typeof address === 'object') {
+                const { address: addrHost, port } = address as AddressInfo;
+                displayHost = addrHost;
+                displayPort = port;
+            }
+
+            if (displayHost === '::' || displayHost === '0.0.0.0') {
+                displayHost = 'localhost';
+            }
+
+            console.log(`🚀 Server is running on http://${displayHost}:${displayPort}`);
+            console.log(`💾 Database: PostgreSQL`);
+            console.log(`🔗 Database: ${process.env.DB_HOST || 'localhost'}:${process.env.DB_PORT || '5432'}/${process.env.DB_NAME || 'attendance_db'}`);
+        }
 
     } catch (error) {
         console.error('❌ Failed to start server:', error);

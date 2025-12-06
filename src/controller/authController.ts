@@ -40,7 +40,16 @@ export const login = async (req: Request<{}, {}, LoginRequestBody>, res: Respons
         }
 
         // Generate JWT token
-        const JWT_SECRET = process.env.JWT_SECRET || 'secret';
+        const JWT_SECRET = process.env.JWT_SECRET;
+        if (!JWT_SECRET) {
+            console.error('JWT_SECRET is not configured');
+            res.status(500).json({
+                success: false,
+                message: 'Cấu hình server không đúng'
+            });
+            return;
+        }
+
         const token = jwt.sign(
             {
                 id: loginResult.user.id,
@@ -62,11 +71,11 @@ export const login = async (req: Request<{}, {}, LoginRequestBody>, res: Respons
                 role: loginResult.user.role
             }
         });
-    } catch (error) {
+    } catch (error: unknown) {
         console.error('Login controller error:', error);
         res.status(500).json({
             success: false,
-            message: 'Đã xảy ra lỗi khi xử lý yêu cầu đăng nhập'
+            message: error instanceof Error ? error.message : 'Đã xảy ra lỗi khi xử lý yêu cầu đăng nhập'
         });
     }
 };
@@ -98,7 +107,16 @@ export const register = async (req: Request<{}, {}, RegisterRequestBody>, res: R
 
 
         // Generate JWT token
-        const JWT_SECRET = process.env.JWT_SECRET as string;
+        const JWT_SECRET = process.env.JWT_SECRET;
+        if (!JWT_SECRET) {
+            console.error('JWT_SECRET is not configured');
+            res.status(500).json({
+                success: false,
+                message: 'Cấu hình server không đúng'
+            });
+            return;
+        }
+
         const token = jwt.sign(
             {
                 id: registerResult.user.id,
@@ -120,11 +138,11 @@ export const register = async (req: Request<{}, {}, RegisterRequestBody>, res: R
                 role: registerResult.user.role
             }
         });
-    } catch (error) {
+    } catch (error: unknown) {
         console.error('Register controller error:', error);
         res.status(500).json({
             success: false,
-            message: 'Đã xảy ra lỗi khi xử lý yêu cầu đăng ký'
+            message: error instanceof Error ? error.message : 'Đã xảy ra lỗi khi xử lý yêu cầu đăng ký'
         });
     }
 };
