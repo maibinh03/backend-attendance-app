@@ -8,6 +8,21 @@ export async function initializePostgresDatabase(): Promise<void> {
     console.log('🔌 Connecting to PostgreSQL database...');
     await pool.connect();
 
+    // Kiểm tra xem database đã được khởi tạo chưa
+    const [existingTables] = await pool.query<{ tablename: string }>(
+      "SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename IN ('users', 'attendance')"
+    );
+
+    const hasUsersTable = existingTables.some((t: any) => t.tablename === 'users');
+    const hasAttendanceTable = existingTables.some((t: any) => t.tablename === 'attendance');
+
+    if (hasUsersTable && hasAttendanceTable) {
+      console.log('✅ Database already initialized. Skipping schema creation.');
+      return;
+    }
+
+    console.log('📦 Database not initialized. Creating schema...');
+
     // Tìm file schema từ nhiều vị trí có thể
     const possiblePaths = [
       path.join(__dirname, '../../database/database.postgres.sql'),

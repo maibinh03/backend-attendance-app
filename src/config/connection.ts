@@ -13,16 +13,42 @@ class PostgresConnection {
   private pool: Pool;
 
   constructor() {
-    this.pool = new Pool({
-      host: process.env.DB_HOST || 'localhost',
-      port: parseInt(process.env.DB_PORT || '5432'),
-      database: process.env.DB_NAME || 'attendance_db',
-      user: process.env.DB_USER || 'postgres',
-      password: process.env.DB_PASSWORD || '',
-      max: 20,
-      idleTimeoutMillis: 30000,
-      connectionTimeoutMillis: 2000,
-    });
+    // Hỗ trợ Neon connection string hoặc các biến môi trường riêng lẻ
+    const connectionString = process.env.DATABASE_URL;
+
+    let poolConfig: any;
+
+    if (connectionString) {
+      // Sử dụng connection string (Neon, Supabase, etc.)
+      // Lưu ý: Nếu connection string có sslmode trong URL, pg sẽ tự động xử lý SSL
+      // Không cần set SSL config riêng để tránh conflict
+      poolConfig = {
+        connectionString: connectionString,
+        max: 20,
+        idleTimeoutMillis: 30000,
+        connectionTimeoutMillis: 2000,
+        // Chỉ set SSL nếu connection string không có sslmode và DB_SSL được set
+        // Nếu connection string đã có sslmode=require, pg sẽ tự động xử lý
+      };
+    } else {
+      // Sử dụng các biến môi trường riêng lẻ (cho local development)
+      poolConfig = {
+        host: process.env.DB_HOST,
+        port: parseInt(process.env.DB_PORT as string),
+        database: process.env.DB_NAME,
+        user: process.env.DB_USER,
+        password: process.env.DB_PASSWORD,
+        max: 20,
+        idleTimeoutMillis: 30000,
+        connectionTimeoutMillis: 2000,
+        // SSL cho production (Neon)
+        ssl: process.env.DB_SSL === 'true' ? {
+          rejectUnauthorized: false
+        } : false,
+      };
+    }
+
+    this.pool = new Pool(poolConfig);
 
     // Log connection errors
     this.pool.on('error', (err) => {
